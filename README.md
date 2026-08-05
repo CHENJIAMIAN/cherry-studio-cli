@@ -1,3 +1,5 @@
+[English](./README.en.md)
+
 # Cherry Studio CLI
 
 <!-- codex-github-rules:bilingual-summary -->
