@@ -1,5 +1,12 @@
 # Cherry Studio CLI
 
+<!-- codex-github-rules:bilingual-summary -->
+> **中文简介**：Cherry Studio 本地 API 命令行工具，支持模型别名与 Chat、Anthropic、Responses 兼容工作流。
+>
+> **English summary**: A Cherry Studio local API command-line client with model aliases and Chat, Anthropic, and Responses-compatible workflows.
+
+---
+
 一个面向 Windows 和 PowerShell 7 的 Cherry Studio 本地 API 命令行客户端。
 
 它提供两条独立能力：
@@ -10,6 +17,26 @@
   Completions、OpenAI Responses 或 Anthropic Messages 的其他客户端。
 
 直接模式**不依赖 CLIProxyAPI**。CLIProxyAPI 仅在需要完整兼容代理时使用。
+
+## English Overview
+
+Cherry Studio CLI is a Windows and PowerShell 7 client for the local Cherry Studio
+API Server. Direct mode does not require CLIProxyAPI: it supports model discovery,
+friendly provider aliases, OpenAI Chat Completions, and Anthropic Messages.
+
+```powershell
+pwsh -File .\install.ps1
+cherry alias <raw-provider-prefix> <friendly-prefix>
+cherry models
+cherry ask "Explain quicksort." -Model "opencode:deepseek-v4-flash-free" -Format anthropic
+```
+
+Use `cherry request -Format chat|anthropic -BodyFile .\request.json` to forward a
+complete JSON request body. `cherry ask -Format responses` is a convenient
+single-turn fallback when Cherry Studio does not expose `/v1/responses`; full
+Responses API requests go to CLIProxyAPI at `http://127.0.0.1:8317/v1/responses`
+with `CLIPROXY_API_KEY` and slash-separated proxy model IDs such as
+`opencode/deepseek-v4-flash-free`.
 
 ## 前提条件
 
