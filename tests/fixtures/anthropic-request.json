@@ -1,0 +1,17 @@
+{
+  "model": "opencode:deepseek-v4-flash-free",
+  "max_tokens": 32,
+  "system": "Reply only with OK.",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Confirm the request body was accepted."
+        }
+      ]
+    }
+  ],
+  "stream": false
+}

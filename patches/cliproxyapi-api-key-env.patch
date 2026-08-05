@@ -1,0 +1,110 @@
+diff --git a/config.example.yaml b/config.example.yaml
+--- a/config.example.yaml
++++ b/config.example.yaml
+@@ -311,6 +311,7 @@ openai-compatibility:
+ #         proxy-url: "socks5://proxy.example.com:1080" # optional: per-key proxy override
+ #         # proxy-url: "direct" # optional: explicit direct connect for this credential
+ #       - api-key: "sk-or-v1-...b781" # without proxy-url
++#       - api-key-env: "CHERRY_STUDIO_API_KEY" # optional: resolve the key from this runtime environment variable
+ #     models: # The models supported by the provider.
+ #       - name: "moonshotai/kimi-k2:free" # The actual model name.
+ #         alias: "kimi-k2"               # The alias used in the API.
+diff --git a/internal/api/handlers/management/config_lists.go b/internal/api/handlers/management/config_lists.go
+--- a/internal/api/handlers/management/config_lists.go
++++ b/internal/api/handlers/management/config_lists.go
+@@ -1096,6 +1096,7 @@ func normalizeOpenAICompatibilityEntry(entry *config.OpenAICompatibility) {
+ 	for i := range entry.APIKeyEntries {
+ 		trimmed := strings.TrimSpace(entry.APIKeyEntries[i].APIKey)
+ 		entry.APIKeyEntries[i].APIKey = trimmed
++		entry.APIKeyEntries[i].APIKeyEnv = strings.TrimSpace(entry.APIKeyEntries[i].APIKeyEnv)
+ 		if trimmed != "" {
+ 			existing[trimmed] = struct{}{}
+ 		}
+diff --git a/internal/config/config.go b/internal/config/config.go
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -621,10 +621,22 @@ type OpenAICompatibilityAPIKey struct {
+ 	// APIKey is the authentication key for accessing the external API services.
+ 	APIKey string `yaml:"api-key" json:"api-key"`
+ 
++	// APIKeyEnv names an environment variable that supplies the API key at runtime.
++	// When set, it takes precedence over APIKey and is never persisted as APIKey.
++	APIKeyEnv string `yaml:"api-key-env,omitempty" json:"api-key-env,omitempty"`
++
+ 	// ProxyURL overrides the global proxy setting for this API key if provided.
+ 	ProxyURL string `yaml:"proxy-url,omitempty" json:"proxy-url,omitempty"`
+ }
+ 
++// ResolvedAPIKey returns the runtime API key without mutating the configuration.
++func (key OpenAICompatibilityAPIKey) ResolvedAPIKey() string {
++	if envName := strings.TrimSpace(key.APIKeyEnv); envName != "" {
++		return strings.TrimSpace(os.Getenv(envName))
++	}
++	return strings.TrimSpace(key.APIKey)
++}
++
+ // OpenAICompatibilityModel represents a model configuration for OpenAI compatibility,
+ // including the actual model name and its alias for API routing.
+ type OpenAICompatibilityModel struct {
+diff --git a/internal/config/openai_compat_env_test.go b/internal/config/openai_compat_env_test.go
+new file mode 100644
+--- /dev/null
++++ b/internal/config/openai_compat_env_test.go
+@@ -0,0 +1,33 @@
++package config
++
++import "testing"
++
++func TestOpenAICompatibilityAPIKeyResolvedAPIKey(t *testing.T) {
++	t.Run("environment variable takes precedence", func(t *testing.T) {
++		t.Setenv("CLIPROXY_TEST_API_KEY", "  runtime-key  ")
++		entry := OpenAICompatibilityAPIKey{
++			APIKey:    "literal-key",
++			APIKeyEnv: "CLIPROXY_TEST_API_KEY",
++		}
++		if got := entry.ResolvedAPIKey(); got != "runtime-key" {
++			t.Fatalf("ResolvedAPIKey() = %q, want runtime-key", got)
++		}
++	})
++
++	t.Run("missing environment variable does not fall back to literal", func(t *testing.T) {
++		entry := OpenAICompatibilityAPIKey{
++			APIKey:    "literal-key",
++			APIKeyEnv: "CLIPROXY_TEST_API_KEY_MISSING",
++		}
++		if got := entry.ResolvedAPIKey(); got != "" {
++			t.Fatalf("ResolvedAPIKey() = %q, want empty string", got)
++		}
++	})
++
++	t.Run("literal key remains supported", func(t *testing.T) {
++		entry := OpenAICompatibilityAPIKey{APIKey: "  literal-key  "}
++		if got := entry.ResolvedAPIKey(); got != "literal-key" {
++			t.Fatalf("ResolvedAPIKey() = %q, want literal-key", got)
++		}
++	})
++}
+diff --git a/internal/watcher/diff/openai_compat.go b/internal/watcher/diff/openai_compat.go
+--- a/internal/watcher/diff/openai_compat.go
++++ b/internal/watcher/diff/openai_compat.go
+@@ -87,7 +87,7 @@ func describeOpenAICompatibilityUpdate(oldEntry, newEntry config.OpenAICompatibility) {
+ func countAPIKeys(entry config.OpenAICompatibility) int {
+ 	count := 0
+ 	for _, keyEntry := range entry.APIKeyEntries {
+-		if strings.TrimSpace(keyEntry.APIKey) != "" {
++		if strings.TrimSpace(keyEntry.APIKey) != "" || strings.TrimSpace(keyEntry.APIKeyEnv) != "" {
+ 			count++
+ 		}
+ 	}
+diff --git a/internal/watcher/synthesizer/config.go b/internal/watcher/synthesizer/config.go
+--- a/internal/watcher/synthesizer/config.go
++++ b/internal/watcher/synthesizer/config.go
+@@ -238,7 +238,7 @@ func (s *ConfigSynthesizer) synthesizeOpenAICompat(ctx *SynthesisContext) []*core.Auth {
+ 		createdEntries := 0
+ 		for j := range compat.APIKeyEntries {
+ 			entry := &compat.APIKeyEntries[j]
+-			key := strings.TrimSpace(entry.APIKey)
++			key := entry.ResolvedAPIKey()
+ 			proxyURL := strings.TrimSpace(entry.ProxyURL)
+ 			idKind := fmt.Sprintf("openai-compatibility:%s", providerName)
+ 			id, token := idGen.Next(idKind, key, base, proxyURL)

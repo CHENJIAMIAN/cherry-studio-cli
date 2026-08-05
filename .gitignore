@@ -1,0 +1,21 @@
+# Local CLI state
+config.json
+config.local.json
+
+# Runtime data and credentials
+auths/
+logs/
+run/
+bin/
+*.log
+*.secret
+*.secrets
+
+# Tooling
+.codegraph/
+.vscode/
+.idea/
+
+# Operating system files
+Thumbs.db
+.DS_Store
