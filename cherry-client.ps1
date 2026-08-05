@@ -458,7 +458,7 @@ function Invoke-FullRequest {
     }
     catch {
         if ($RequestFormat -eq 'responses' -and $_.Exception.Message -match 'HTTP 404') {
-            throw 'Cherry Studio local API Server does not expose /v1/responses. Run cherry connect and call the CLIProxyAPI /v1/responses endpoint for full Responses API support.'
+            throw 'Cherry Studio local API Server does not expose /v1/responses. cherry request always targets the configured Cherry Studio base URL and does not switch to CLIProxyAPI automatically. Run cherry connect, then call the CLIProxyAPI /v1/responses endpoint with its CLIPROXY_API_KEY and a slash-separated proxy model ID for full Responses API support.'
         }
         throw
     }

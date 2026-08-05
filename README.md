@@ -59,16 +59,22 @@ cherry models
 cherry default "opencode:deepseek-v4-flash-free"
 cherry ask "讲一个笑话" -Model "opencode:deepseek-v4-flash-free"
 cherry ask "说明这个工具调用" -Model "opencode:deepseek-v4-flash-free" -Format anthropic -Json
+cherry ask "解释快速排序" -Model "opencode:deepseek-v4-flash-free" -Format responses -Json
 ```
 
 `ask` 是单轮文本便捷命令。它支持 `chat`、`anthropic` 和
 `responses` 三种输出形式；当本地 Cherry Studio 没有 `/v1/responses` 时，
 便捷 Responses 请求会回退为 Chat Completions 适配结果。
 
+这条回退路径只接受提示词、模型、系统提示词和最大 token 数，再把 Chat Completions
+结果包装成 Responses 形状。它不提供完整 Responses 的多轮输入、工具调用、后台任务、
+事件流或其它 Responses 专属语义。
+
 ## 完整协议请求
 
 需要多轮消息、内容块、工具、图片、思考参数、停止序列或其它协议专属字段时，使用
-`request`，把完整 JSON 放在文件或标准输入中：
+`request`，把完整 JSON 放在文件或标准输入中。默认 Cherry Studio 直连模式适用于
+完整 Chat Completions 和 Anthropic Messages 请求：
 
 ```powershell
 cherry request -Format anthropic -BodyFile .\anthropic-request.json -Json
@@ -88,7 +94,8 @@ Get-Content .\request.json -Raw | cherry request -Format anthropic -BodyFile -
 - `/v1/messages`
 
 若它返回 `/v1/responses` 的 404，说明该本地 API Server 本身不提供 Responses
-端点，不是 CLI 丢弃了请求字段。请启用下方的 CLIProxyAPI 集成。
+端点，不是 CLI 丢弃了请求字段。`cherry request -Format responses` 不会自动切换到
+CPA；完整 Responses 请求请按下方的 CPA 调用方式发送。
 
 ## 可选 CLIProxyAPI 集成
 
@@ -116,6 +123,44 @@ http://127.0.0.1:8317/v1/messages
 CLIProxyAPI 的客户端模型名采用斜杠分隔。例如上述别名会成为
 `opencode/deepseek-v4-flash-free`。完整的构建、补丁和安全配置步骤见
 [docs/CLIProxyAPI.md](docs/CLIProxyAPI.md)。
+
+## 选择 Responses 调用方式
+
+| 需求 | 调用位置 | 模型名 | 认证 |
+| --- | --- | --- | --- |
+| 简单单轮文本 | `cherry ask ... -Format responses` | `opencode:...` | `CHERRY_STUDIO_API_KEY` |
+| 完整 Responses API | `http://127.0.0.1:8317/v1/responses` | `opencode/...` | `CLIPROXY_API_KEY` |
+
+完整 Responses 请求由 CPA 提供，调用它的是外部客户端或 HTTP 工具，而不是
+`cherry request`：
+
+```powershell
+$headers = @{
+    Authorization = 'Bearer <CLIPROXY_API_KEY>'
+    'Content-Type' = 'application/json'
+}
+$body = @{
+    model = 'opencode/deepseek-v4-flash-free'
+    input = @(
+        @{
+            role = 'user'
+            content = @(
+                @{
+                    type = 'input_text'
+                    text = '解释快速排序。'
+                }
+            )
+        }
+    )
+    max_output_tokens = 1024
+} | ConvertTo-Json -Depth 20
+
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8317/v1/responses' -Headers $headers -Body $body
+```
+
+`CHERRY_STUDIO_API_KEY` 是 CPA 访问 Cherry Studio 上游时使用的令牌；
+`CLIPROXY_API_KEY` 是客户端访问 CPA 时使用的令牌。二者不能互换。客户端的
+`CLIPROXY_API_KEY` 由 CPA 自己的 `api-keys` 配置决定，应通过秘密管理机制提供。
 
 ## 边界与安全
 
