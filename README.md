@@ -9,7 +9,7 @@
 
 ---
 
-一个面向 Windows 和 PowerShell 7 的 Cherry Studio 本地 API 命令行客户端。
+一个面向 Windows、macOS、Linux 和 WSL2 的 Cherry Studio 本地 API 命令行客户端。
 
 它提供两条独立能力：
 
@@ -18,36 +18,44 @@
 - 可选地接入 CLIProxyAPI，把 Cherry Studio 的模型暴露给需要 OpenAI Chat
   Completions、OpenAI Responses 或 Anthropic Messages 的其他客户端。
 
-直接模式**不依赖 CLIProxyAPI**。CLIProxyAPI 仅在需要完整兼容代理时使用。
+直接模式**不依赖 CLIProxyAPI**。CLIProxyAPI 仅在需要完整兼容代理时使用，当前其
+运行目录约定面向 Windows。
 
-## English Overview
+## 一键安装
 
-Cherry Studio CLI is a Windows and PowerShell 7 client for the local Cherry Studio
-API Server. Direct mode does not require CLIProxyAPI: it supports model discovery,
-friendly provider aliases, OpenAI Chat Completions, and Anthropic Messages.
+### Windows（PowerShell）
 
 ```powershell
-pwsh -File .\install.ps1
-cherry alias <raw-provider-prefix> <friendly-prefix>
-cherry models
-cherry ask "Explain quicksort." -Model "opencode:deepseek-v4-flash-free" -Format anthropic
+iwr -useb https://raw.githubusercontent.com/CHENJIAMIAN/cherry-studio-cli/main/install.ps1 | iex
 ```
 
-Use `cherry request -Format chat|anthropic -BodyFile .\request.json` to forward a
-complete JSON request body. `cherry ask -Format responses` is a convenient
-single-turn fallback when Cherry Studio does not expose `/v1/responses`; full
-Responses API requests go to CLIProxyAPI at `http://127.0.0.1:8317/v1/responses`
-with `CLIPROXY_API_KEY` and slash-separated proxy model IDs such as
-`opencode/deepseek-v4-flash-free`.
+### macOS、Linux 和 WSL2
 
-## 前提条件
+```bash
+curl -fsSL https://raw.githubusercontent.com/CHENJIAMIAN/cherry-studio-cli/main/install.sh | bash
+```
 
-- Windows 10/11。
-- [PowerShell 7](https://learn.microsoft.com/powershell/)。
-- 已安装 Cherry Studio，并在“设置 -> API Server”中启动本地 API Server。
-- 通过安全的凭据管理机制向调用进程提供 `CHERRY_STUDIO_API_KEY`。
+安装器会：
 
-## 安装
+- 检测 PowerShell 7；Windows 会在可用时通过 `winget` 安装它，macOS/Linux/WSL2
+  会下载用户目录下的官方便携版。
+- 下载完整 CLI 运行时、创建 `cherry` 启动器，并将启动器目录加入用户 `PATH`。
+- 仅安装本项目实际需要的 PowerShell 运行时，**不依赖 Node.js**。
+
+Windows 安装后可立即运行 `cherry help`。macOS/Linux/WSL2 的管道命令在子 shell
+中执行，请重新打开终端，或先直接运行安装器输出的 `~/.local/bin/cherry help`。
+
+默认安装位置如下：
+
+| 平台 | CLI 运行时 | 启动器 |
+| --- | --- | --- |
+| Windows | `%LOCALAPPDATA%\Programs\CherryStudioCLI` | `%USERPROFILE%\.local\bin\cherry.cmd` |
+| macOS/Linux/WSL2 | `${XDG_DATA_HOME:-~/.local/share}/cherry-studio-cli` | `~/.local/bin/cherry` |
+
+重复运行同一条命令即可更新 CLI。安装脚本默认从 `main` 下载；需要审计或固定版本时，
+请克隆对应提交或标签后从本地运行安装器。
+
+## 从源码安装
 
 ```powershell
 git clone https://github.com/CHENJIAMIAN/cherry-studio-cli.git
@@ -55,16 +63,32 @@ Set-Location .\cherry-studio-cli
 pwsh -File .\install.ps1
 ```
 
-安装器会在 `%USERPROFILE%\.local\bin` 创建 `cherry.cmd`。将该目录加入用户
-`PATH` 后重新打开终端。
+在 macOS、Linux 或 WSL2 中：
+
+```bash
+git clone https://github.com/CHENJIAMIAN/cherry-studio-cli.git
+cd cherry-studio-cli
+bash ./install.sh
+```
+
+本地安装器会复制运行时文件到用户安装目录，因此之后可以删除克隆目录。
+
+## 前提条件
+
+- 已安装 Cherry Studio，并在“设置 -> API Server”中启动本地 API Server。
+- 通过安全的凭据管理机制向调用进程提供 `CHERRY_STUDIO_API_KEY`。
+- 一键安装会处理 PowerShell 7；从源码手动运行 CLI 时需要 PowerShell 7。
 
 ## 凭据
 
 项目不会创建明文密钥文件。
 
 - 已安装 Codex DPAPI 凭据库时，可运行 `cherry configure`。
-- 其他环境请由操作系统、终端或 CI 的秘密管理机制提供
+- 其他环境请由操作系统、终端、CI 或组织的秘密管理机制提供
   `CHERRY_STUDIO_API_KEY`。
+
+安装 CLI 并不替代这一步：每位用户仍需在自己的 Cherry Studio 中启用 API Server，
+并使用自己的 API key。
 
 ## 友好模型别名
 
@@ -127,6 +151,9 @@ Get-Content .\request.json -Raw | cherry request -Format anthropic -BodyFile -
 CPA；完整 Responses 请求请按下方的 CPA 调用方式发送。
 
 ## 可选 CLIProxyAPI 集成
+
+当前 CLIProxyAPI 运行目录和 `cliproxy-server.exe` 的约定面向 Windows。直接模式不受
+影响，仍可在 macOS、Linux 和 WSL2 使用。
 
 ```powershell
 $env:CHERRY_CLI_PROXY_RUN_DIRECTORY = 'C:\path\to\cliproxy-run'

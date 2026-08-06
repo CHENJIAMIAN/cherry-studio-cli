@@ -31,9 +31,31 @@ $script:SecretName = 'CHERRY_STUDIO_API_KEY'
 $script:DefaultBaseUrl = 'http://127.0.0.1:23333'
 $script:ClientPath = Join-Path $PSScriptRoot 'cherry-client.ps1'
 $script:CLIProxyConnectPath = Join-Path $PSScriptRoot 'scripts\Connect-CLIProxyAPI.ps1'
-$script:VaultListPath = Join-Path $env:USERPROFILE '.codex\scripts\Get-CodexSecretNames.ps1'
-$script:VaultSetPath = Join-Path $env:USERPROFILE '.codex\scripts\Set-CodexSecret.ps1'
-$script:VaultInvokePath = Join-Path $env:USERPROFILE '.codex\scripts\Invoke-CodexSecretCommand.ps1'
+$powerShellFileName = if ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+    'pwsh.exe'
+}
+else {
+    'pwsh'
+}
+$currentPowerShell = Join-Path $PSHOME $powerShellFileName
+$script:PowerShellExecutable = if (Test-Path -LiteralPath $currentPowerShell) {
+    $currentPowerShell
+}
+else {
+    'pwsh'
+}
+$script:UserHome = if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+    $env:USERPROFILE
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:HOME)) {
+    $env:HOME
+}
+else {
+    [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+}
+$script:VaultListPath = Join-Path $script:UserHome '.codex\scripts\Get-CodexSecretNames.ps1'
+$script:VaultSetPath = Join-Path $script:UserHome '.codex\scripts\Set-CodexSecret.ps1'
+$script:VaultInvokePath = Join-Path $script:UserHome '.codex\scripts\Invoke-CodexSecretCommand.ps1'
 
 function Get-CherryConfigPath {
     if (-not [string]::IsNullOrWhiteSpace($env:CHERRY_CLI_CONFIG_PATH)) {
@@ -217,10 +239,10 @@ function Invoke-CherryChild {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($env:CHERRY_STUDIO_API_KEY)) {
-        & pwsh @Arguments
+        & $script:PowerShellExecutable @Arguments
     }
     else {
-        & $script:VaultInvokePath -SecretName $script:SecretName -FilePath 'pwsh' -ArgumentList $Arguments
+        & $script:VaultInvokePath -SecretName $script:SecretName -FilePath $script:PowerShellExecutable -ArgumentList $Arguments
     }
     exit $LASTEXITCODE
 }
