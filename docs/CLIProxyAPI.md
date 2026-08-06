@@ -1,5 +1,7 @@
 # CLIProxyAPI 可选集成
 
+> [English](CLIProxyAPI.en.md)
+
 `cherry connect` 不是使用 Cherry Studio CLI 的前提条件。它只在需要让其他客户端
 访问本机兼容 API 时使用。
 
